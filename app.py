@@ -1,7 +1,11 @@
 from flask import Flask, request
 from flask_restful import Resource, Api
-from models import Pessoas, Atividades, Usuarios
+from models import Atividades, Usuarios, db_session
 from flask_httpauth import HTTPBasicAuth
+from repository.pessoas import PessoasRepository
+from repository.atividades import AtividadesRepository
+from repository.usuarios import UsuariosRepository
+import bcrypt
 
 auth = HTTPBasicAuth()
 app = Flask(__name__)
@@ -10,95 +14,110 @@ api = Api(app)
 
 @auth.verify_password 
 def verificacao(login, senha):
-    if not (login, senha):
-        return False
-    return Usuarios.query.filter_by(login=login, senha=senha).first()
+    password_encoded = senha.encode('utf-8')
+    usuarios = UsuariosRepository.query.all()
+    dados_por_usuario = [{'id': i.id, 'login': i.login, 'senha': i.senha} for i in usuarios]
+    for i in dados_por_usuario:
+        if login in i.values():
+            senha_bd = i.get('senha')
+    db_session.close()
+    if bcrypt.checkpw(password=password_encoded, hashed_password=senha_bd):
+        return True
+    return False
 
 
-class Pessoa(Resource):
-    @auth.login_required 
-    def get(self, nome):
-        pessoa = Pessoas.query.filter_by(nome=nome).first()
-
-        try:
-            if not pessoa:
-                response = {
-                    'status': 'error',
-                    'mensagem': 'Pessoa nao encontrada.'
-                }, 404
-
-            response = {
-                'nome': pessoa.nome,
-                'idade': pessoa.idade,
-                'id': pessoa.id
-            }
-        except Exception as e:
-            response = {'message': 'ocorreu um erro ao buscar informação'}, 404
-        return response
-
-    def put(self, nome):
-        pessoa = Pessoas.query.filter_by(nome=nome).first()
-        dados = request.json
-        if 'nome' in dados:
-            pessoa.nome = dados['nome']
-        if 'idade' in dados:
-            pessoa.idade = dados['idade']
-        pessoa.save()
-        response = {
-            'id': pessoa.id,
-            'nome': pessoa.nome,
-            'idade': pessoa.idade
-        }
-        return response
-
-    def delete(self, nome):
-        pessoa = Pessoas.query.filter_by(nome=nome).first()
-        mensagem = f'Pessoa {pessoa.nome} excluída com sucesso.'
-        pessoa.delete()
-        return {'status': 'sucesso', 'mensagem': mensagem}
-
-
-class ListaPessoas(Resource):
-    @auth.login_required()
+class Pessoas(Resource): 
     def get(self):
-        pessoas = Pessoas.query.all()
-        response = [{'id': i.id, 'nome': i.nome, 'idade': i.idade} for i in pessoas]
-        return response
-
+        pessoas = PessoasRepository.get()
+        return pessoas
+    
+    @auth.login_required
     def post(self):
         dados = request.json
-        pessoa = Pessoas(nome=dados['nome'], idade=dados['idade'])
-        pessoa.save()
-        response = {
-            'id': pessoa.id,
-            'nome': pessoa.nome,
-            'idade': pessoa.idade
-        }
-        return response
+        retorno_adicao_de_registro = PessoasRepository.save(nome=dados['nome'], idade=dados['idade'])
+        return retorno_adicao_de_registro
+
+    @auth.login_required
+    def put(self):
+        dados = request.json
+        retorno_modificacao = PessoasRepository.modify(id=dados['id'], 
+                                                         nome=dados['nome'], 
+                                                         idade=dados['idade'])
+        return retorno_modificacao
+
+    @auth.login_required
+    def delete(self):
+        dados = request.json
+        retorno_exclusao = PessoasRepository.delete(id=dados['id'])
+        return retorno_exclusao
 
 
-class ListaAtividades(Resource):
+class Atividades(Resource):
     def get(self):
-        atividades = Atividades.query.all()
-        response = [{'id': i.id, 'nome': i.nome, 'pessoa': i.pessoa.nome} for i in atividades]
-        return response
+        atividades = AtividadesRepository.get()
+        return atividades
 
+    @auth.login_required
     def post(self):
         dados = request.json
-        pessoa = Pessoas.query.filter_by(nome=dados['pessoa']).first()
-        atividade = Atividades(nome=dados['nome'], pessoa=pessoa)
-        atividade.save()
-        response = {
-            'pessoa': atividade.pessoa.nome,
-            'nome': atividade.nome,
-            'id': atividade.id
-        }
-        return response
+        retorno_adicao_de_atividade = AtividadesRepository.save(nome_atividade=dados['nome'],  
+                                                                pessoa_id=dados['pessoa_id'])
+        return retorno_adicao_de_atividade
+
+    @auth.login_required
+    def put(self):
+        dados = request.json
+        retorno_modificacao = AtividadesRepository.modify(id=dados['id'], 
+                                                          nome_atividade=dados['nome'], 
+                                                          pessoa_id=dados['pessoa_id'])
+        return retorno_modificacao
+
+    @auth.login_required
+    def delete(self):
+        dados = request.json
+        retorno_exclusao = AtividadesRepository.delete(id=dados['id'])
+        return retorno_exclusao
 
 
-api.add_resource(Pessoa, '/pessoa/<string:nome>/')
-api.add_resource(ListaPessoas, '/pessoa/')
-api.add_resource(ListaAtividades, '/atividades/')
+class Usuarios(Resource):
+    def get(self):
+        usuarios = UsuariosRepository.get()
+        return usuarios
+    
+    @auth.login_required
+    def post(self):
+        dados = request.json
+        registrar_usuario = UsuariosRepository.save(usuario=dados['usuario'], senha=dados['senha'])
+        return registrar_usuario
+
+    @auth.login_required
+    def put(self):
+        dados = request.json
+        modificar_usuario = UsuariosRepository.modify(id=dados['id'], 
+                                                      usuario=dados['usuario'], 
+                                                      senha=dados['senha'])
+        return modificar_usuario
+
+    @auth.login_required
+    def delete(self):
+        dados = request.json
+        deletar_usuario = UsuariosRepository.delete(id=dados['id'])
+        return deletar_usuario
+
+
+class Login(Resource):
+    def get(self):
+        dados_login = request.json
+        usuario_verificado = verificacao(login=dados_login['usuario'], senha=dados_login['senha'])
+        if usuario_verificado:
+            return {'status': 'sucesso', 'mensagem': 'Login efetuado.'}
+        return {'status': 'erro', 'mensagem': 'Usuário e/ou senha inválido.'}
+
+
+api.add_resource(Pessoas, '/pessoas/')
+api.add_resource(Atividades, '/atividades/')
+api.add_resource(Usuarios, '/usuarios/')
+api.add_resource(Login, '/login/')
 
 
 if __name__ == '__main__':
