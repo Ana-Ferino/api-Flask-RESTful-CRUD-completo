@@ -1,6 +1,6 @@
 from dtos.login import LoginDTO
 from services.auth.redis_data import save_token_in_db
-from config import BaseConfig
+from config import AppConfig
 import jwt
 import datetime
 
@@ -16,7 +16,7 @@ class SessaoServices:
 
             token = jwt.encode(
                 payload,
-                BaseConfig.SecretsToken.secret_key,
+                AppConfig.SecretsToken.secret_key,
                 algorithm='HS256'
             )
 
@@ -27,7 +27,7 @@ class SessaoServices:
     
     def decode_auth_session_token(auth_token) -> int | str:
         try:
-            payload = jwt.decode(auth_token, BaseConfig.SecretsToken.secret_key)
+            payload = jwt.decode(auth_token, AppConfig.SecretsToken.secret_key)
             return payload['sub'], 200
         
         except jwt.ExpiredSignatureError:
