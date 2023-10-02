@@ -1,37 +1,62 @@
 from models.usuarios import Usuarios
 from models.database import db_session
-from services.utils import criptografar_senha
+from services.utils import encrypt_password
+from dtos.usuario import UsuarioDTO
+from dtos.signup import SignUpRequestDTO
+from exceptions import UserAlreadyExistsError, UserNotExistsError
 
 
-class UsuariosServices():
-    def get():
-        usuarios = Usuarios.query.all()
-        dados_por_usuario = [{'id': i.id, 'login': i.login} for i in usuarios]
-        db_session.close()
-        return dados_por_usuario
+class UsuariosServices():  
+
+    def get(self, username: str):
+        user = Usuarios.query.filter_by(login=username).first()
+
+        if user:
+            return user
+        else:
+            raise UserNotExistsError
     
-    def save(usuario, senha):
-        hash = criptografar_senha(senha)
-        novo_usuario = Usuarios(login=usuario, senha=hash)
-        db_session.add(novo_usuario)
+    def save(self, usuario: SignUpRequestDTO):
+        user_already_exists = self.get(usuario.usuario)
+        if user_already_exists:
+            raise UserAlreadyExistsError
+        
+        hash = encrypt_password(usuario.senha)
+        new_user = Usuarios(login=usuario.usuario, senha=hash)
+        db_session.add(new_user)
         db_session.commit()
         db_session.close()
-        return {'status': 'sucesso', 'mensagem': 'Usuário registrado com sucesso.'}
 
-    def modify(id, usuario, senha):
-        hash = criptografar_senha(senha)
-        user = Usuarios.query.filter_by(id=id).first()
-        if user:
-            user.login = usuario
-            user.senha = hash
+    def modify(self, usuario_atual: str, novo_usuario: UsuarioDTO):
+        new_login = novo_usuario.login
+        new_password = novo_usuario.senha
+
+        if new_login:
+            new_username_already_exists = self.get(new_login)
+            if new_username_already_exists:
+                raise UserAlreadyExistsError
+        
+        current_user = self.get(usuario_atual)
+        
+        if current_user:
+            if new_login:
+                current_user.login = new_login
+            if new_password:
+                hash_pw = encrypt_password(new_password)
+                current_user.senha = hash_pw
             db_session.commit()
             db_session.close()
-            return {'status': 'sucesso', 'mensagem': 'Usuário editado com sucesso.'}
-        db_session.close()
+        else:
+            db_session.close()
+            raise UserNotExistsError
     
-    def delete(id):
-        usuario_a_deletar = Usuarios.query.filter_by(id=id).first()
-        db_session.delete(usuario_a_deletar)
-        db_session.commit()
-        db_session.close()
-        return {'status': 'sucesso', 'mensagem': 'Usuário excluído com sucesso.'}
+    def delete(self, usuario: UsuarioDTO):
+        user_to_delete = self.get(usuario.login)
+
+        if user_to_delete:
+            db_session.delete(user_to_delete)
+            db_session.commit()
+            db_session.close()
+        else:
+            db_session.close()
+            raise UserNotExistsError
