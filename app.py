@@ -2,7 +2,6 @@ from flask_restful import Api
 from flask import Flask, request
 from middlewares.auth_middleware import AuthMiddleware
 from routes import setup_routes
-from config import AppConfig
 from monitoring.log_config import custom_log
 
 app = Flask(__name__)
@@ -19,14 +18,12 @@ def handler_exception(error):
 
 @app.after_request
 def log_after_request(response):
-    ip_addr = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
 
     app.logger.info(
-        "path: %s | method: %s | status: %s | IP: %s",
+        "path: %s | method: %s | status: %s ",
         request.path,
         request.method,
-        response.status,
-        ip_addr
+        response.status
     )
     return response
 
