@@ -19,3 +19,5 @@ class SignUpController(Resource):
             return 'ERROR: {}'.format(uae), 422
         except ValidationError as error:
             return {'errors': error.errors()}, 420
+        except Exception as excp:
+            return 'An error occurred: {}'.format(excp), 500

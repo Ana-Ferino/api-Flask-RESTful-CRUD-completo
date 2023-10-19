@@ -3,7 +3,7 @@ from services.usuario_services import UsuariosServices
 from dtos.login import LoginDTO
 from dtos.usuario import UsuarioDTO
 from config import AppConfig
-from exceptions import UnauthorizedModification
+from exceptions import UnauthorizedModification, UserNotExistsError
 import datetime
 import bcrypt
 import jwt
@@ -19,7 +19,7 @@ class SessaoServices:
             validated = bcrypt.checkpw(password=password_encoded, hashed_password=user.senha)
             return validated
         
-        return False
+        raise UserNotExistsError
     
 
     def validate_token_in_db(self, token: LoginDTO) -> bool:

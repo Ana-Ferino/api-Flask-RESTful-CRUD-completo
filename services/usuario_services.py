@@ -10,11 +10,8 @@ class UsuariosServices():
 
     def get(self, username: str):
         user = Usuarios.query.filter_by(login=username).first()
-
         if user:
             return user
-        else:
-            raise UserNotExistsError
     
     def save(self, usuario: SignUpRequestDTO):
         user_already_exists = self.get(usuario.usuario)
