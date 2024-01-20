@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  myapp:
+    restart: always
+    build: .
+    container_name: flask-sqlite
+    volumes:
+      - ./code:/app
+    ports:
+      - "5050:5000"
+    depends_on:
+      - redis
+  redis:
+    image: redis:latest
+    container_name: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 20
+    restart: always
+    ports:
+      - '6379:6379'
+  flask:
+    build: .
+    container_name: flask
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/code
+    depends_on:
+      - redis
