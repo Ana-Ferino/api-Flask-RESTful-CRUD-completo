@@ -1,46 +1,57 @@
 from models.database import db_session
 from models.pessoas import Pessoas
+from dtos.person import PersonDTO
+from exceptions import PersonAlreadyExistsError, PersonNotExistsError
 
 
-class PessoasServices(Pessoas):
-    def __init__(self, nome, idade):
-        self.nome = nome
-        self.idade = idade
+class PessoasServices:
     
-    def get():
-        pessoas = Pessoas.query.all()
-        dados_por_pessoa = [{'id': i.id, 'nome': i.nome, 'idade': i.idade} for i in pessoas]
+    def get(self, name: str = None, id: int = None):
+        if name:
+            person = Pessoas.query.filter_by(nome=name).first()
+        else:
+            person = Pessoas.query.filter_by(id=id).first()
+        return person if person else None
+
+    def modify(self, name: str, new_data: PersonDTO):
+        new_name = new_data.name
+        new_age = new_data.age
+
+        if new_name:
+            new_name_already_exists = self.get(new_name)
+            if new_name_already_exists:
+                raise PersonAlreadyExistsError
+        
+        current_person = self.get(name)
+
+        if current_person:
+            if new_name:
+                current_person.nome = new_name
+            if new_age:
+                current_person.idade = new_age
+            db_session.commit()
+            db_session.close()
+        else:
+            db_session.close()
+            raise PersonNotExistsError
+
+    def save(self, person: PersonDTO):
+        person_already_exists = self.get(person.name)
+        if person_already_exists:
+            raise PersonAlreadyExistsError
+        
+        new_person = Pessoas(nome=person.name, idade=person.age)
+        db_session.add(new_person)
+        db_session.commit()
         db_session.close()
-        return dados_por_pessoa
 
-    def modify(id, nome, idade):
-        try:
-            pessoa = Pessoas.query.filter_by(id=id).first()
-            if pessoa:
-                pessoa.nome = nome
-                pessoa.idade = idade
-                db_session.commit()
-                return {'status': 'sucesso', 'mensagem': 'pessoa editada com sucesso.'} 
-            db_session.close()
-        except Exception:
-            {'status': 'erro', 'mensagem': 'ocorreu um erro, verifique os dados enviados.'}
+    def delete(self, person: PersonDTO):
+        person_to_delete = self.get(person.name)
 
-    def save(nome, idade):
-        try:
-            nova_pessoa = PessoasServices(nome, idade)
-            db_session.add(nova_pessoa)
+        if person_to_delete:
+            db_session.delete(person_to_delete)
             db_session.commit()
             db_session.close()
-            return {'status': 'sucesso', 'mensagem': 'pessoa adicionada com sucesso.'}
-        except Exception:
-            return {'status': 'erro', 'mensagem': 'ocorreu um erro, verifique os dados enviados.'}
-
-    def delete(id):
-        try:
-            pessoa_a_deletar = Pessoas.query.filter_by(id=id).first()
-            db_session.delete(pessoa_a_deletar)
-            db_session.commit()
+        else:
             db_session.close()
-            return {'status': 'sucesso', 'mensagem': 'pessoa excluída com sucesso.'}
-        except Exception:
-            return {'status': 'erro', 'mensagem': 'ocorreu um erro, verifique os dados enviados.'}
+            raise PersonNotExistsError
