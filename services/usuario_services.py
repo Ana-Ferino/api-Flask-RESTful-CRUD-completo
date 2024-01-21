@@ -6,7 +6,7 @@ from dtos.signup import SignUpRequestDTO
 from exceptions import UserAlreadyExistsError, UserNotExistsError
 
 
-class UsuariosServices():  
+class UsuariosServices:  
 
     def get(self, username: str):
         user = Usuarios.query.filter_by(login=username).first()
