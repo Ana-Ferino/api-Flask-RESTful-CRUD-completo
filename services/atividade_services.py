@@ -1,52 +1,54 @@
 from models.atividades import Atividades
-from models.pessoas import Pessoas
 from models.database import db_session
+from dtos.activity import ActivityDTO
+from exceptions import ActivityAlreadyExistsError, ActivityNotExistsError
 
 
-class AtividadesServices(Atividades):
-    def __init__(self, nome_atividade, pessoa):
-        self.nome = nome_atividade
-        self.pessoa = pessoa
+class AtividadesServices:
 
-    def get():
-        atividades = Atividades.query.all()
-        dados_por_atividade = [{'id': i.id, 
-                                'nome': i.nome, 
-                                'pessoa_id': i.pessoa_id, 
-                                'pessoa': i.pessoa.nome} for i in atividades]
+    def get(self, name: str):
+        activity = Atividades.query.filter_by(nome=name).first()
+        return activity if activity else None
+
+    def modify(self, name: str, new_activity: ActivityDTO):
+        new_activity = new_activity.name
+        person = new_activity.person_id
+
+        if new_activity:
+            activity_already_exists = self.get(new_activity)
+            if activity_already_exists:
+                raise ActivityAlreadyExistsError
+        
+        current_activity = self.get(name)
+
+        if current_activity:
+            if new_activity:
+                current_activity.nome = new_activity
+            if person:
+                current_activity.pessoa_id = person
+            db_session.commit()
+            db_session.close()
+        else:
+            db_session.close()
+            raise ActivityNotExistsError
+
+    def save(self, activity: ActivityDTO):
+        activity_already_exists = self.get(activity.name)
+        if activity_already_exists:
+            raise ActivityAlreadyExistsError
+        
+        new_activity = Atividades(nome=activity.name, pessoa_id=activity.person_id)
+        db_session.add(new_activity)
+        db_session.commit()
         db_session.close()
-        return dados_por_atividade
 
-    def modify(id, nome_atividade, pessoa_id):
-        try:
-            pessoa_associada = Pessoas.query.filter_by(id=pessoa_id).first()
-            atividade = Atividades.query.filter_by(id=id).first()
-            if atividade:
-                atividade.nome = nome_atividade
-                atividade.pessoa = pessoa_associada
-                db_session.commit()
-                return {'status': 'sucesso', 'mensagem': 'atividade editada com sucesso.'}
-            db_session.close()
-        except Exception:
-            {'status': 'erro', 'mensagem': 'ocorreu um erro, verifique os dados enviados.'}
+    def delete(self, activity: ActivityDTO):
+        activity_to_delete = self.get(activity.name)
 
-    def save(nome_atividade, pessoa_id):
-        try:
-            pessoa_associada = Pessoas.query.filter_by(id=pessoa_id).first()
-            nova_atividade = AtividadesServices(nome_atividade, pessoa_associada)
-            db_session.add(nova_atividade)
+        if activity_to_delete:
+            db_session.delete(activity_to_delete)
             db_session.commit()
             db_session.close()
-            return {'status': 'sucesso', 'mensagem': 'atividade adicionada com sucesso.'}
-        except Exception:
-            return {'status': 'erro', 'mensagem': 'ocorreu um erro, verifique os dados enviados.'}
-
-    def delete(id):
-        try:
-            atividade_a_deletar = Atividades.query.filter_by(id=id).first()
-            db_session.delete(atividade_a_deletar)
-            db_session.commit()
+        else:
             db_session.close()
-            return {'status': 'sucesso', 'mensagem': 'atividade excluída com sucesso.'}
-        except Exception:
-            return {'status': 'erro', 'mensagem': 'ocorreu um erro, verifique os dados enviados.'}
+            raise ActivityNotExistsError
