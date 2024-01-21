@@ -4,7 +4,6 @@ from flask_restful import Resource
 from exceptions import UserAlreadyExistsError, UserNotExistsError, UnauthorizedModification
 from dtos.login import LoginDTO
 from dtos.usuario import UsuarioDTO
-from dtos.login import LoginDTO
 from flask import request, current_app
 
 
